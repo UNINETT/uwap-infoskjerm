@@ -1,0 +1,1 @@
+This is an application running in UNINETT WebApp Park. Users can create, manage and view automatic slideshows. The application currently uses Impress.js and CKEditor, but other slideshow-types and slide-types can be added by making new files in the js/plugin-folder. See the existing files for documentation on making new types.
