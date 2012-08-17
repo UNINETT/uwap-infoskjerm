@@ -10,11 +10,13 @@ define(['lib/impress'], function() {
 	//Goes between duration/probability-input and the slide-specific UI.
 	ImpressShow.prototype.addSlideHTML = function($div){
 		$div.html(
-				'Impress.js options (optional): <br /><input placeholder="data-x" id="datax"></input>'
-				+'<input placeholder="data-y" id="datay"></input><input placeholder="data-z" id="dataz"></input>'
-				+'<input placeholder="rotate" id="rotate"></input><input placeholder="data-scale" id="dscale"></input>'
-				+'<input placeholder="data-rotate-x" id="drotatex"></input><input placeholder="data-rotate-y" id="drotatey"></input>'
-				+'<input placeholder="data-rotate-z" id="drotatez"></input>'
+				'<b>Optional Impress.js options (calculated defaults in parenthesis):</b> <br />'
+				+'<i>Pixel-coordinates from the show\'s start-position:<br />'
+				+'<input placeholder="data-x (slidenumber*1000)" id="datax"></input>'
+				+'<input placeholder="data-y (slidenumber*200)" id="datay"></input><input placeholder="data-z (slidenumber*500)" id="dataz"></input>'
+				+'<br />Rotate-angle:<input placeholder="rotate (slidenumber*45)" id="rotate"></input> Relative scale: <input placeholder="data-scale (1)" id="dscale"></input>'
+				+'<br />Rotate around the axes: <input placeholder="data-rotate-x (slidenumber*45)" id="drotatex"></input><input placeholder="data-rotate-y (slidenumber*45)" id="drotatey"></input>'
+				+'<input placeholder="data-rotate-z (slidenumber*45)"  id="drotatez"></input></i>'
 		);
 	};
 	
@@ -53,6 +55,15 @@ define(['lib/impress'], function() {
 		impress().goto($('#'+slide.sid)[0]);
 	};
 	
+	//Another way of doing it; showNext in a while-loop for prob?
+	ImpressShow.prototype.showNext = function($div){
+		var foundSlide = false;
+		while(!foundSlide){
+			impress().next();
+			foundSlide = true;
+		}
+	}
+	
 	//Optional. Called to start the show. Used for setting up the slides.
 	ImpressShow.prototype.start = function($div, show){
 		$div.html('<div id="impress">' 
@@ -61,7 +72,7 @@ define(['lib/impress'], function() {
 //				+'</div>'
 				+'</div>');
 		$.each(show.slides, function(i, sl){
-			var dx = i*800;
+			var dx = i*1000;
 			var dy = i*200;
 			var dz = i*500;
 			var dscale = 1;

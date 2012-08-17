@@ -47,22 +47,60 @@ require(['plugins/CkSlide', 'plugins/ImpressShow','js/lib/router.jquery.js'], fu
 		
 		function showNewSlide(){
 			try{
-				var ranProb = Math.random()*totalProbability;
-				var tempProb = 0;
-				var i = 0;
-				while(tempProb<ranProb){
-					tempProb= tempProb + parseFloat(show.slides[i].probability);
-					i++;
+				if(show.notRandom){
+//					console.log('not random..');
+					if(currentSlide == null){
+						currentSlide = show.slides[0];
+					}else{
+						var foundSlide = false;
+						var slideNo;
+						var randomNo;
+						while(!foundSlide){
+							slideNo = $.inArray(currentSlide, show.slides)+1;
+							if(show.slides[slideNo]){
+								currentSlide = show.slides[slideNo];
+							}
+							else{
+								slideNo = 0;
+								currentSlide = show.slides[0];
+							}
+							randomNo = Math.random();
+							currentSlide.probability = currentSlide.probability.replace(",", ".");
+//							console.log(currentSlide.probability +' vs '+randomNo);
+							if(currentSlide.probability > randomNo){
+								foundSlide = true;
+							}
+							
+						}
+						
+					}
+					plug.showHTML($('#container'), currentSlide);
+					setTimeout(function(){showNewSlide();}, currentSlide.duration * 1000);
+					if(!status.error){
+						status='Showing slide '+(slideNo+1);
+						status.statusColor = 'green';
+					}
 				}
-//				console.log('Total prob: '+totalProbability+', gave random: '+ranProb+', and now tempProb is: '+tempProb);
-//				console.log('show slide: '+(i-1));
-				plug.showHTML($('#container'), show.slides[i-1]);
-//				console.log('Will show for '+show.slides[i-1].duration+' seconds');
-				setTimeout(function(){showNewSlide();}, show.slides[i-1].duration * 1000);
+				else{
+					var ranProb = Math.random()*totalProbability;
+					var tempProb = 0;
+					var i = 0;
+					while(tempProb<ranProb){
+						tempProb= tempProb + parseFloat(show.slides[i].probability);
+						i++;
+					}
+//					console.log('Total prob: '+totalProbability+', gave random: '+ranProb+', and now tempProb is: '+tempProb);
+//					console.log('show slide: '+(i-1));
+					plug.showHTML($('#container'), show.slides[i-1]);
+					setTimeout(function(){showNewSlide();}, show.slides[i-1].duration * 1000);
 				if(!status.error){
 					status='Showing slide '+(i-1);
 					status.statusColor = 'green';
 				}
+				}				
+//				console.log('Will show for '+show.slides[i-1].duration+' seconds');
+				
+				
 			}
 			catch(ex){
 				reportError(ex, 'showing a new slide');
@@ -170,7 +208,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow','js/lib/router.jquery.js'], fu
 					var tempStamp = moment().format("YYYY-MM-DD HH:mm:ss");
 					var tempStatus = status;
 					var tempStatusColor = statusColor;
-					UWAP.store.save({"type": "msg", "st": "true", "status": tempStatus, "sid":show.sid, "device":device, "statusColor": tempStatusColor, "timestamp": tempStamp}, function(d){
+					UWAP.store.save({"type": "msg", "st": "true", "uwap-acl-read": show['uwap-acl-read'], "status": tempStatus, "sid":show.sid, "device":device, "statusColor": tempStatusColor, "timestamp": tempStamp}, function(d){
 						UWAP.store.queryOne({"type":"msg", "st": "true","status":tempStatus, "sid":show.sid, "device":device, "statusColor": tempStatusColor, "timestamp":tempStamp}, function(d){
 							storedStatus = d;
 						}, catchError);
@@ -192,7 +230,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow','js/lib/router.jquery.js'], fu
 		function deleteMSG(){
 //			console.log('deleteMSG');
 			try{
-				UWAP.store.remove({"type": "msg", "device": device, "st":"true"}, function(){}, catchError);
+				UWAP.store.remove({"type": "msg", "device": device, "sid": show.sid, "st":"true"}, function(){}, catchError);
 			}
 			catch(ex){
 				reportError(ex, 'tried deleting messages')
@@ -204,37 +242,40 @@ require(['plugins/CkSlide', 'plugins/ImpressShow','js/lib/router.jquery.js'], fu
 			UWAP.store.save(msg, function(){}, catchError);
 		}
 		function checkMessages(){
-			//timestamp this.
-//			console.log('checking for commands');
-			var tempTime = moment().format("YYYY-MM-DD HH:mm:ss");
-			UWAP.store.queryList({"type": "msg", "command":"true", "sid": show.sid, "timestamp":{ $gt: messageTimeStamp}}, function(d){
-				messageTimeStamp = tempTime;
-				$.each(d, function(i,msg){
-//					saveMsgRead(msg);
-					console.log('got new message: ');
-					console.log(msg);
-					switch(msg.code){
-					case "restart":
-						console.log('restarting');
-						status = 'restarting';
-						status.statusColor = 'red';
-						sendStatus();
-						refreshPage();
-						break;
-					case "execute":
-						status = 'executing code';
-						status.statusColor = 'red';
-						sendStatus();
-						eval(msg.exec);
-						break;
-					default:
+			try{
+				var tempTime = moment().format("YYYY-MM-DD HH:mm:ss");
+				UWAP.store.queryList({"type": "msg", "command":"true", "sid": show.sid, "timestamp":{ $gt: messageTimeStamp}}, function(d){
+					messageTimeStamp = tempTime;
+					$.each(d, function(i,msg){
+						console.log('got new message: ');
 						console.log(msg);
-					}
+						switch(msg.code){
+						case "restart":
+							console.log('restarting');
+							status = 'restarting';
+							status.statusColor = 'red';
+							sendStatus();
+							refreshPage();
+							break;
+						case "execute":
+							status = 'executing code';
+							status.statusColor = 'red';
+							sendStatus();
+							eval(msg.exec);
+							break;
+						default:
+							console.log(msg);
+						}
 
-				});
+					});
 
 
-			}, catchError);
+				}, catchError);
+			}
+			catch(err){
+				reportError(err, 'checking for or performing commands');
+			}
+
 		}
 
 //Only used for logging. reportError should be used for sending msg.

@@ -10,7 +10,8 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			this.useShows = new Array();
 			this.adminShows = new Array();
 			this.messageTime = moment().format("YYYY-MM-DD HH:mm:ss");
-			
+			this.ignored = new Array();
+			this.ignoredBool = false;
 			
 			
 		};
@@ -32,6 +33,10 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 		};
 		SM.prototype.listMySlideShow = function(show){
 			console.log('List in admin: '+show.title);
+			var randomHTML = '(random order)';
+			if(show.notRandom){
+				randomHTML = '(not random order)';
+			}
 			$('#adminAccordion').append('<div class="accordion-group" >'
 					+'<div class="accordion-heading">'
 					+'<a  class="accordion-toggle" data-toggle="collapse" data-parent="#adminAccordion" href="#collapse'+show._id.$id+'">'
@@ -40,8 +45,8 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 					+'<div class="accordion-inner">'
 					+'<textarea style="width:95%" id="descr'+show._id.$id+'" placeholder="Description">'
 					+show.description+'</textarea>'
-					+'<p> <b>Type: '+show.stype+'</b> <a  id="del'+show._id.$id+'" href="javascript:void(0)"> - delete</a></p>'
-					+'<div id="dev'+show.sid+'"><p> <b> Devices showing this slideshow (in the last hour): </b></p></div>'
+					+'<p> <b>Type: '+show.stype+'</b> '+randomHTML+' <a  id="del'+show._id.$id+'" href="javascript:void(0)"> - delete show</a></p>'
+					+'<div id="dev'+show.sid+'"><p> <b> Devices that have shown this slideshow (<a class="coloring" href="javascript:void(0)" rel="tooltip" title ="Green: Running now without errors. <br /> Red: Running now with errors <br /> Orange: Not running (has not updated status in the last minute)">colors</a>):</p></div>'
 					+'<p><b>Slides: </b></p><div></div>'
 					+'</div></div>'
 					+'</div>');
@@ -54,7 +59,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 				showRemoved(show);
 			});
 			$(".collapse").collapse('hide');
-			
+			$(".coloring").tooltip();
 			$('#adminAccordion').find('div').last().append(
 					'<select id="sel'+show.sid+'" class="slideTypeSelect"></select>'
 					+'<a href="javascript:void(0)" class="btn" id="addSlide"><i class="icon-plus"></i>Add slide</a><br />')
@@ -65,8 +70,9 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			$.each(slideTypes, function(i, type){
 				$sel.append('<option>'+type.title+'</option>');
 			});
+			$('#adminAccordion').find('div').last().append('<div id="slideDiv'+show.sid+'"></div>');
 			if(show.slides){
-				$('#adminAccordion').find('div').last().append('<div id="slideDiv'+show.sid+'"></div>');
+				
 				$.each(show.slides, function(i, slide){
 					$('#adminAccordion').find('div').last().append('<a href="javascript:void(0)" id="'+slide.sid+'">'+(i+1)
 							+'</a> - ').find('a').last().click(function(){
@@ -87,7 +93,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			console.log(show);
 			console.log(slide);
 			$('.modal-header').html('<h3>Edit '+slide.stype+'-slide');
-			$('.modal-body').html('').append('<div><input id="durationInput" placeholder="Duration">'
+			$('.modal-body').html('').append('<div><input id="durationInput" placeholder="Duration (seconds)">'
 					+'</input><input id="probInput" placeholder="Probability"></input></div>');
 			$.each(slideShowTypes, function(i, t){
 				if(t.title == show.stype){
@@ -140,6 +146,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			console.log('setIntervals');
 			setInterval(checkMessages, 15000);
 			setInterval(deleteCommands, 60000);
+			
 		};
 		SM.prototype.slideShowTypesView = function(){
 			console.log('test');
@@ -160,7 +167,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			console.log(show);
 			console.log(id);
 			$('.modal-header').html('<h3>Add '+slideTypes[id].title+'-slide');
-			$('.modal-body').html('').append('<div><input id="durationInput" placeholder="Duration">'
+			$('.modal-body').html('').append('<div><input id="durationInput" placeholder="Duration (seconds)">'
 					+'</input><input id="probInput" placeholder="Probability"></input></div>');
 
 
@@ -209,6 +216,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 					+'Available to: <select id="group" placeholder="ID of usergroup"></select>'
 					
 					+'<textarea id="showDescription" placeholder="Description" style="width:90%"></textarea>'
+					+'<p><input type="checkbox" id="randomCheck" /> Show in random order based on the probability of the slide. If unchecked, the probability determines the chance a slide is shown in one runthrough.</p>'
 			);
 			$('.modal-footer').html('<a href="#" class="btn" data-dismiss="modal">Close</a> <a href="#" id="saveButton"'
 					+'class="btn btn-primary">Save</a>');
@@ -225,9 +233,14 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 				if($('#showTitle').val() != '')
 				{
 					var r = $('#group').prop('selectedIndex'); 
-					
-					showAdded({"type":"slideshow", "description": $('#showDescription').val(), "title": $('#showTitle').val(), "uwap-acl-read": [groups[r].ident],
-						"owner": user.userid, "stype": slideShowTypes[id].title, "sid": uuid.v1()});
+					var tempShow = {"type":"slideshow", "description": $('#showDescription').val(), "title": $('#showTitle').val(), "uwap-acl-read": [groups[r].ident],
+						"owner": user.userid, "stype": slideShowTypes[id].title, "sid": uuid.v1()};
+					console.log($('#randomCheck').prop('checked'));
+					if($('#randomCheck').prop('checked') == false){
+						console.log('not random');
+						tempShow.notRandom = "true";
+					}
+					showAdded(tempShow);
 					$('#myModal').modal();
 
 				}
@@ -264,20 +277,34 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 		}
 		function checkMessages(){
 			console.log('Checking messages..');
-			UWAP.store.queryList({"type":"msg", "timestamp": { $gt: this.messageTime}}, messagesGotten, catchError);
+			var tempTime = this.messageTime;
 			this.messageTime = moment().format("YYYY-MM-DD HH:mm:ss");
+			UWAP.store.queryList({"type":"msg", "timestamp": { $gt: tempTime}}, messagesGotten, catchError);
+			
 		}
 		function messagesGotten(d){
+			$.each(d, function(i, msg){
+				if(msg.ignore){
+					console.log('ignoring ' +msg.device+ ' for slideshow '+msg.sid);
+					sm.ignored.push(msg);
+				}
+			});
 
 			$.each(d, function (i, msg){
 				if($('#dev'+msg.sid)[0]){
-
-					if(msg.timestamp && moment().subtract('hours', 1).format("YYYY-MM-DD HH:mm:ss") < msg.timestamp){
-
-						
+					var colorClass = "orange";
+					if(msg.timestamp && moment().subtract('minutes', 1).format("YYYY-MM-DD HH:mm:ss") < msg.timestamp){
+						colorClass = msg.statusColor;
+					}
 						var inMessages = false;
 						$.each(sm.messages, function(i, mess){
 							if(mess.device == msg.device && mess.sid == msg.sid){
+								inMessages = true;
+							}
+						});
+						$.each(sm.ignored, function(i, device){
+							if(device.device == msg.device && device.sid == msg.sid){
+								//not really a descriptive varname anymore..
 								inMessages = true;
 							}
 						});
@@ -291,7 +318,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 
 								}
 								else{
-									$('#dev'+msg.sid).append('<a class="'+msg.statusColor+'" href="javascript:void">'+msg.device+'</a><br />').find('a').last()
+									$('#dev'+msg.sid).append('<p id="'+msg.sid+msg.device+'"><a class="'+colorClass+'" href="javascript:void">'+msg.device+'</a> - <a href="javascript:void(0)" id="'+msg.sid+msg.device+'ignore">ignore device</a></p>').find('p').last().find('a').first()
 									.click(function(){
 										$('.modal-header').html(
 												'<h3>'+msg.device+'</h3>'
@@ -307,6 +334,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 										else{
 											statusHTML+=msg.status;
 										}
+										statusHTML+='<p><b>Timestamp:</b> '+msg.timestamp+'</p>';
 
 										$('.modal-body').html(
 												statusHTML
@@ -328,11 +356,19 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 										});
 
 										$('#myModal').modal();
+									}).parent().find('a').last().click(function(){
+										console.log('plcik');
+										console.log(this);
+										$(this).parent().remove();
+										
+										ignore(msg);
 									});
+									
 								}
 							}
 						}
-					}
+					
+					
 				}
 				else{
 					setTimeout(function(){messagesGotten([msg]);}, 1000);
@@ -343,12 +379,25 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			console.log('Deleting commands');
 			UWAP.store.remove({"type": "msg", "command": "true", "timestamp":{ $lt: moment().subtract('minutes', 1).format("YYYY-MM-DD HH:mm:ss")}}, function(){}, catchError);
 		}
+		function ignore(ign){
+			UWAP.store.save({"type": "msg", "ignore": "true", "sid": ign.sid, "device": ign.device, "timestamp": moment().format("YYYY-MM-DD HH:mm:ss")}, function(){}, catchError);
+		}
+		function ignoredGotten(d){
+			ignoredBool = true;
+			$.each(d, function(i, ign){
+				sm.ignored.push(ign);
+				ignore(ign);
+				
+			});
+		}
 		function loggedIn(u){
+			
 			user = u;
 			for(var key in user.groups) {
 				groups.push({name: user.groups[key], ident: key});
 			}
 			sm.init();
+			
 			$('#deviceInput').val(u.name+'\'s computer');
 		}	
 		
@@ -410,6 +459,7 @@ require(['plugins/CkSlide', 'plugins/ImpressShow', 'lib/uuid'], function(){
 			UWAP.store.save(show,
 					function(){
 				sm.init();
+				sm.messageTime = moment().subtract(3, 'years').format("YYYY-MM-DD HH:mm:ss");
 			}, catchError);
 			
 		}
